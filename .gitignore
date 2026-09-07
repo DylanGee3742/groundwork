@@ -9,3 +9,5 @@ wheels/
 # Virtual environments
 .venv
 .env
+
+src/groundwork/vertical/data/raw_docs
