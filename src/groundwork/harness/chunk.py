@@ -9,6 +9,17 @@ from groundwork.harness.models.section_chunk import SectionChunk
 from markdown_it import MarkdownIt
 from re import match
 
+def plain_text(inline_token):
+    return ''.join(child.content for child in inline_token.children if child.type == 'text')
+
+def matches_heading_pattern(text):
+    return bool(
+        SECTION.match(text)
+        or APPENDIX.match(text)
+        or CLAUSE.match(text)
+        or SIMPLE_NUMBERED_ITEM.match(text)
+    )
+
 def build_chunk(markdown_path):
     with open(markdown_path, encoding="utf-8") as f:
         text = f.read()
@@ -18,19 +29,47 @@ def build_chunk(markdown_path):
     current_page = 1
     current_section_key = None
     open_chunk = None
+    it = iter(tokens)
+    chunks = []
 
-    for token in tokens:
-        match = SECTION.match(token.content)
-        # print(match)
-        # if match:
-        #     print(token)
+    inside_table = False
 
-    return tokens
+    for token in it:
+        if token.type == 'html_block':
+            if page_num := PAGE_MARKER.match(token.content):
+                current_page = int(page_num.group(1))
+                continue
+
+        if token.type == 'table_open':
+            inside_table = True
+        elif token.type == 'table_close':
+            inside_table = False 
+
+        if token.type == 'heading_open':
+            text = plain_text(next(it))
+            if open_chunk is not None:
+                chunks.append(open_chunk)
+            open_chunk = {'heading': text, 'content': ''}
+
+        elif token.type == 'inline' and not inside_table:
+            text = plain_text(token)
+            if matches_heading_pattern(text):
+                if open_chunk is not None:
+                    chunks.append(open_chunk)
+                open_chunk = {'heading': text, 'content': ''}
+            elif open_chunk is not None:
+                open_chunk['content'] += text
+
+        elif open_chunk is not None:
+            open_chunk['content'] += token.content
+
+    return chunks
 
 chunks = build_chunk("/Users/dylangee/workspace/groundwork/src/groundwork/vertical/data/outputs/ITT Water Plan - Final 020926.md")
-for chunk in chunks:
-    if 'SECTION' in chunk.content:
-        print(chunk)
+print(chunks)
+# for chunk in chunks:
+#     if 'SECTION' in chunk.content:
+#         print(chunk)
 
 
     # function build_chunks(markdown_text):
